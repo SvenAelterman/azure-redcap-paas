@@ -67,11 +67,19 @@ else
   wget -q -O /tmp/redcap.zip $APPSETTING_redcapAppZip
 fi
 
+# Remove default content in wwwroot
 rm -f /home/site/wwwroot/hostingstart.html
-unzip -oq /tmp/redcap.zip -d /tmp/wwwroot 
+# Unzip to /tmp for local disk I/O
+unzip -oq /tmp/redcap.zip -d /tmp/wwwroot
+# Move unzipped contents to wwwroot
 mv /tmp/wwwroot/redcap/* /home/site/wwwroot/
+
+echo "Unzipped REDCap and moved to wwwroot" >> /home/site/log-$stamp.txt
+
 rm -rf /tmp/wwwroot
 rm /tmp/redcap.zip
+
+echo "Removed temporary files" >> /home/site/log-$stamp.txt
 
 ####################################################################################
 #
@@ -101,10 +109,12 @@ sed -i "s/$salt = '';/$salt = '$(echo $RANDOM | md5sum | head -c 20; echo;)';/" 
 ####################################################################################
 
 echo "Configuring REDCap recommended settings" >> /home/site/log-$stamp.txt
+
 sed -i "s|SMTP[[:space:]]*= ''|SMTP = '$APPSETTING_smtpFQDN'|" /home/site/repository/Files/settings.ini
 sed -i "s|smtp_port[[:space:]]*= |smtp_port = $APPSETTING_smtpPort|" /home/site/repository/Files/settings.ini
 sed -i "s|sendmail_from[[:space:]]*= ''|sendmail_from = '$APPSETTING_fromEmailAddress'|" /home/site/repository/Files/settings.ini
 sed -i "s|sendmail_path[[:space:]]*= ''|sendmail_path = '/usr/sbin/sendmail -t -i'|" /home/site/repository/Files/settings.ini
+
 cp /home/site/repository/Files/settings.ini /home/site/redcap.ini
 
 ####################################################################################
