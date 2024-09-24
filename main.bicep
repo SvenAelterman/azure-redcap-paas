@@ -58,7 +58,19 @@ param smtpPort string = ''
 param smtpFromEmailAddress string = ''
 
 var sequenceFormatted = format('{0:00}', sequence)
-var rgNamingStructure = replace(replace(replace(replace(replace(namingConvention, '{rtype}', 'rg'), '{workloadName}', '${workloadName}-{rgName}'), '{loc}', location), '{seq}', sequenceFormatted), '{env}', environment)
+var rgNamingStructure = replace(
+  replace(
+    replace(
+      replace(replace(namingConvention, '{rtype}', 'rg'), '{workloadName}', '${workloadName}-{rgName}'),
+      '{loc}',
+      location
+    ),
+    '{seq}',
+    sequenceFormatted
+  ),
+  '{env}',
+  environment
+)
 var vnetName = nameModule[0].outputs.shortName
 var strgName = nameModule[1].outputs.shortName
 var webAppName = nameModule[2].outputs.shortName
@@ -185,18 +197,20 @@ var resourceTypes = [
 ]
 
 @batchSize(1)
-module nameModule 'modules/common/createValidAzResourceName.bicep' = [for workload in resourceTypes: {
-  name: take(replace(deploymentNameStructure, '{rtype}', 'nameGen-${workload}'), 64)
-  params: {
-    location: location
-    environment: environment
-    namingConvention: namingConvention
-    resourceType: workload
-    sequence: sequence
-    workloadName: workloadName
-    addRandomChars: 4
+module nameModule 'modules/common/createValidAzResourceName.bicep' = [
+  for workload in resourceTypes: {
+    name: take(replace(deploymentNameStructure, '{rtype}', 'nameGen-${workload}'), 64)
+    params: {
+      location: location
+      environment: environment
+      namingConvention: namingConvention
+      resourceType: workload
+      sequence: sequence
+      workloadName: workloadName
+      addRandomChars: 4
+    }
   }
-}]
+]
 
 module rolesModule './modules/common/roles.bicep' = {
   name: take(replace(deploymentNameStructure, '{rtype}', 'roles'), 64)
@@ -205,7 +219,7 @@ module rolesModule './modules/common/roles.bicep' = {
 var storageAccountKeySecretName = 'storageKey'
 // The secrets object is converted to an array using the items() function, which alphabetically sorts it
 var defaultSecretNames = map(items(secrets), s => s.key)
-var additionalSecretNames = [ storageAccountKeySecretName ]
+var additionalSecretNames = [storageAccountKeySecretName]
 var secretNames = concat(defaultSecretNames, additionalSecretNames)
 
 // The output will be in alphabetical order
@@ -351,8 +365,8 @@ resource webAppResourceGroup 'Microsoft.Resources/resourceGroups@2023-07-01' = {
   name: replace(rgNamingStructure, '{rgName}', 'web')
   location: location
   tags: union(tags, {
-      workloadType: 'web'
-    })
+    workloadType: 'web'
+  })
 }
 
 module webAppModule './modules/webapp/main.bicep' = {
@@ -362,9 +376,8 @@ module webAppModule './modules/webapp/main.bicep' = {
     webAppName: webAppName
     appServicePlanName: planName
     location: location
-    // TODO: Consider deploying as P0V3 to ensure the deployment runs on a scale unit that supports P_v3 for future upgrades. GH issue #50
-    skuName: 'S1'
-    skuTier: 'Standard'
+    // Deploy as P0V3 to ensure the deployment runs on a scale unit that supports P_v3 for future upgrades. GH issue #38
+    skuName: 'P0v3'
     peSubnetId: virtualNetworkModule.outputs.subnets.PrivateLinkSubnet.id
     appInsights_connectionString: monitoring.outputs.appInsightsResourceId
     appInsights_instrumentationKey: monitoring.outputs.appInsightsInstrumentationKey

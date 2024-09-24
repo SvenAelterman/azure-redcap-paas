@@ -3,7 +3,6 @@ param location string = resourceGroup().location
 param webAppName string
 param appServicePlanName string
 param skuName string
-param skuTier string
 param linuxFxVersion string = 'php|8.2'
 param dbHostName string
 #disable-next-line secure-secrets-in-params
@@ -55,7 +54,6 @@ module appService 'webapp.bicep' = {
     appServicePlanName: appServicePlanName
     location: location
     skuName: skuName
-    skuTier: skuTier
     linuxFxVersion: linuxFxVersion
     tags: mergeTags
     dbHostName: dbHostName

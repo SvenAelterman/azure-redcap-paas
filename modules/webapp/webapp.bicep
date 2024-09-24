@@ -2,7 +2,6 @@ param webAppName string
 param appServicePlanName string
 param location string
 param skuName string
-param skuTier string
 param tags object
 param linuxFxVersion string
 
@@ -48,7 +47,6 @@ resource appSrvcPlan 'Microsoft.Web/serverfarms@2022-03-01' = {
   tags: tags
   sku: {
     name: skuName
-    tier: skuTier
   }
   kind: 'linux'
   properties: {
@@ -177,7 +175,7 @@ resource sourcecontrol 'Microsoft.Web/sites/sourcecontrols@2022-09-01' = {
     branch: scmRepoBranch
     isManualIntegration: true
   }
-  dependsOn: [ privateDnsZoneGroupsWebApp ]
+  dependsOn: [privateDnsZoneGroupsWebApp]
 }
 
 resource peWebApp 'Microsoft.Network/privateEndpoints@2022-07-01' = {
