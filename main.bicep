@@ -407,7 +407,7 @@ module webAppModule './modules/webapp/main.bicep' = {
     peSubnetId: virtualNetworkModule.outputs.subnets.PrivateLinkSubnet.id
     appInsights_connectionString: monitoring.outputs.appInsightsResourceId
     appInsights_instrumentationKey: monitoring.outputs.appInsightsInstrumentationKey
-    linuxFxVersion: 'php|8.2'
+    linuxFxVersion: 'php|8.3'
     tags: tags
     customTags: {
       workloadType: 'webApp'
