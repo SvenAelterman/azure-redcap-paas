@@ -132,4 +132,16 @@ cp /home/site/repository/scripts/bash/postbuild.sh /home/site/deployments/tools/
 #
 ####################################################################################
 
-cp /home/site/repository/scripts/bash/startup.sh /home/startup.sh
+#cp /home/site/repository/scripts/bash/startup.sh /home/startup.sh
+
+####################################################################################
+#
+# Create the WebJobs to run the cron.php file every minute
+#
+####################################################################################
+
+mkdir -p /home/site/wwwroot/App_Data
+# cp /home/site/repository/scripts/bash/webjob.sh /home/site/wwwroot/App_Data/jobs/triggered/cron/cron.sh
+# cp /home/site/repository/Files/WebJob/settings.job /home/site/wwwroot/App_Data/jobs/triggered/cron/settings.job
+
+cp -r /home/site/repository/App_Data /home/site/wwwroot/App_Data
