@@ -20,9 +20,9 @@ echo -e "\nFinished running install.php"
 
 ####################################################################################
 #
-# Update additional configuration settings including
-# user file uploading settings to Azure Blob Storage
-# 
+# Create the WebJobs to run the cron.php file every minute
+#
 ####################################################################################
 
-#bash /home/site/repository/scripts/bash/install.sh
+mkdir -p /home/site/wwwroot/App_Data
+cp -r /home/site/repository/App_Data /home/site/wwwroot/App_Data
