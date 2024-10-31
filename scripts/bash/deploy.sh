@@ -15,6 +15,17 @@ stamp=$(date +%Y-%m-%d-%H-%M)
 
 ####################################################################################
 #
+# Check if this script should proceed
+#
+####################################################################################
+
+if [[ "$APPSETTING_DO_DEPLOY_REDCAP" != "1" ]]; then
+  echo "Skipping REDCap deployment (DO_DEPLOY_REDCAP = $APPSETTING_DO_DEPLOY_REDCAP)" >> /home/site/log-$stamp.txt
+  exit 0
+fi
+
+####################################################################################
+#
 # Configure mysqli extension
 #
 ####################################################################################

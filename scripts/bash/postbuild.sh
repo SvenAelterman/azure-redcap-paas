@@ -9,6 +9,17 @@ echo "Hello from postbuild.sh"
 
 ####################################################################################
 #
+# Configure mysqli extension
+#
+####################################################################################
+
+if [[ "$APPSETTING_DO_DEPLOY_REDCAP" != "1" ]]; then
+  echo "Skipping REDCap deployment (DO_DEPLOY_REDCAP = $APPSETTING_DO_DEPLOY_REDCAP)" >> /home/site/log-$stamp.txt
+  exit 0
+fi
+
+####################################################################################
+#
 # Call the install.php file with the option to deploy the database schema.
 # This runs synchronously and will take a few seconds to complete.
 #
