@@ -1,0 +1,1 @@
+/usr/local/bin/php /home/site/wwwroot/cron.php > /dev/null
