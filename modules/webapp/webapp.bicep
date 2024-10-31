@@ -148,6 +148,10 @@ resource webApp 'Microsoft.Web/sites@2022-03-01' = {
           name: 'ENABLE_DYNAMIC_INSTALL'
           value: 'true'
         }
+        {
+          name: 'DO_DEPLOY_REDCAP'
+          value: '0'
+        }
       ]
     }
   }
@@ -177,7 +181,7 @@ resource sourcecontrol 'Microsoft.Web/sites/sourcecontrols@2022-09-01' = {
     branch: scmRepoBranch
     isManualIntegration: true
   }
-  dependsOn: [ privateDnsZoneGroupsWebApp ]
+  dependsOn: [privateDnsZoneGroupsWebApp]
 }
 
 resource peWebApp 'Microsoft.Network/privateEndpoints@2022-07-01' = {
