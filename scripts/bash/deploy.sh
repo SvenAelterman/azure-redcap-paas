@@ -12,6 +12,7 @@
 ####################################################################################
 
 stamp=$(date +%Y-%m-%d-%H-%M)
+echo "deploy.sh started at $stamp" >> /home/site/log-$stamp.txt
 
 ####################################################################################
 #
@@ -144,3 +145,5 @@ cp /home/site/repository/scripts/bash/postbuild.sh /home/site/deployments/tools/
 ####################################################################################
 
 cp /home/site/repository/scripts/bash/startup.sh /home/startup.sh
+
+echo "deploy.sh completed at $(date +%Y-%m-%d-%H-%M)" >> /home/site/log-$stamp.txt

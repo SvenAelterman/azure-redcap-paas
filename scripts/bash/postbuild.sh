@@ -5,7 +5,7 @@
 #
 # MIT License
 
-echo "Hello from postbuild.sh"
+echo "postbuild.sh started at $(date +%Y-%m-%d-%H-%M)" >> /home/site/log-$stamp.txt
 
 ####################################################################################
 #
@@ -25,9 +25,9 @@ fi
 #
 ####################################################################################
 
-curl -sS https://$WEBSITE_HOSTNAME/install.php?auto=1
+curl -sS https://$WEBSITE_HOSTNAME/install.php?auto=1 | tee -a /home/site/log-$stamp.txt
 
-echo -e "\nFinished running install.php"
+echo -e "\nFinished running install.php" | tee -a /home/site/log-$stamp.txt
 
 ####################################################################################
 #
@@ -36,4 +36,7 @@ echo -e "\nFinished running install.php"
 # 
 ####################################################################################
 
+# LATER: Need mysql CLI installed in this context to use it
 #bash /home/site/repository/scripts/bash/install.sh
+
+echo "postbuild.sh completed at $(date +%Y-%m-%d-%H-%M)" >> /home/site/log-$stamp.txt
