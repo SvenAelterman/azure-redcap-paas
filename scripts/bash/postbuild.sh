@@ -21,8 +21,8 @@ echo -e "\nFinished running install.php"
 ####################################################################################
 #
 # Create the WebJobs to run the cron.php file every minute
+# and to facilitate the database configuration.
 #
 ####################################################################################
 
-mkdir -p /home/site/wwwroot/App_Data
-cp -r /home/site/repository/App_Data /home/site/wwwroot/App_Data
+cp -r /home/site/repository/App_Data /home/site/wwwroot
