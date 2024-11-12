@@ -6,7 +6,7 @@ param tags object
 
 // TODO: skuName and SkuTier are related; should be specified as a single object param, IMHO
 @description('Azure database for MySQL sku name ')
-param skuName string = 'Standard_B1s'
+param skuName string = 'Standard_B1ms'
 
 @description('Azure database for MySQL pricing tier')
 @allowed([
@@ -39,7 +39,6 @@ param adminPassword string
 
 @description('MySQL version')
 @allowed([
-  '5.7'
   '8.0.21'
 ])
 param mysqlVersion string = '8.0.21'
@@ -71,54 +70,94 @@ param database_collation string = 'utf8_general_ci'
 
 param currentTime string = utcNow()
 
-resource server 'Microsoft.DBforMySQL/flexibleServers@2022-09-30-preview' = {
-  name: flexibleSqlServerName
-  location: location
-  tags: tags
-  sku: {
-    name: skuName
+module flexibleServer 'br/public:avm/res/db-for-my-sql/flexible-server:0.4.1' = {
+  // TODO: Rename this deployment
+  name: 'FlexibleServerDeployment'
+  params: {
+    name: flexibleSqlServerName
+    location: location
+    skuName: skuName
     tier: SkuTier
-  }
-  properties: {
+
     administratorLogin: adminUserName
     administratorLoginPassword: adminPassword
+
+    privateDnsZoneResourceId: privateDnsZoneId
+    delegatedSubnetResourceId: peSubnetId
+
+    backupRetentionDays: backupRetentionDays
+    geoRedundantBackup: geoRedundantBackup
+
     version: mysqlVersion
-    replicationRole: 'None'
-    createMode: 'Default'
-    backup: {
-      backupRetentionDays: backupRetentionDays
-      geoRedundantBackup: geoRedundantBackup
-    }
-    highAvailability: {
-      mode: highAvailability
-    }
-    network: {
-      delegatedSubnetResourceId: peSubnetId
-      privateDnsZoneResourceId: privateDnsZoneId
-      publicNetworkAccess: publicNetworkAccess
-    }
-    storage: {
-      autoGrow: 'Enabled'
-      iops: StorageIops
-      storageSizeGB: StorageSizeGB
-    }
+
+    storageAutoGrow: 'Enabled'
+    storageAutoIoScaling: 'Enabled'
+    storageIOPS: StorageIops
+    storageSizeGB: StorageSizeGB
+
+    // TODO: Use parameter
+    highAvailability: 'Disabled'
+
+    databases: [
+      {
+        name: databaseName
+        charset: database_charset
+        collation: database_collation
+      }
+    ]
   }
 }
 
-resource database 'Microsoft.DBforMySQL/flexibleServers/databases@2021-12-01-preview' = {
-  parent: server
-  name: databaseName
-  properties: {
-    charset: database_charset
-    collation: database_collation
-  }
-}
+// resource server 'Microsoft.DBforMySQL/flexibleServers@2023-12-30' = {
+//   name: flexibleSqlServerName
+//   location: location
+//   tags: tags
+//   sku: {
+//     name: skuName
+//     tier: SkuTier
+//   }
+//   properties: {
+//     administratorLogin: adminUserName
+//     administratorLoginPassword: adminPassword
+//     version: mysqlVersion
+//     replicationRole: 'None'
+//     createMode: 'Default'
+//     backup: {
+//       backupRetentionDays: backupRetentionDays
+//       geoRedundantBackup: geoRedundantBackup
+//     }
+//     highAvailability: {
+//       mode: highAvailability
+//     }
+//     network: {
+//       delegatedSubnetResourceId: peSubnetId
+//       privateDnsZoneResourceId: privateDnsZoneId
+//       //publicNetworkAccess: publicNetworkAccess
+//     }
+//     storage: {
+//       autoGrow: 'Enabled'
+//       iops: StorageIops
+//       storageSizeGB: StorageSizeGB
+//       autoIoScaling: 'Enabled'
+//       logOnDisk: 'Disabled'
+//     }
+//   }
+// }
+
+// resource database 'Microsoft.DBforMySQL/flexibleServers/databases@2023-12-30' = {
+//   parent: server
+//   name: databaseName
+//   properties: {
+//     charset: database_charset
+//     collation: database_collation
+//   }
+// }
 
 // Assign the Contributor role to the UAMI on the MySQL server to enable setting the "invisible primary key" parameter
 module uamiMySqlRoleAssignmentModule '../common/roleAssignment-mySql.bicep' = {
   name: 'mySqlRole'
   params: {
-    mySqlFlexServerName: server.name
+    mySqlFlexServerName: flexibleServer.outputs.name
     principalId: uamiPrincipalId
     roleDefinitionId: roles.Contributor
   }
@@ -140,13 +179,13 @@ resource dbConfigDeploymentScript 'Microsoft.Resources/deploymentScripts@2020-10
     retentionInterval: 'P1D'
     cleanupPreference: 'OnSuccess'
     forceUpdateTag: currentTime
-    scriptContent: 'az mysql flexible-server parameter set -g ${resourceGroup().name} --server-name ${server.name} --name sql_generate_invisible_primary_key --value OFF'
+    scriptContent: 'az mysql flexible-server parameter set -g ${resourceGroup().name} --server-name ${flexibleServer.outputs.name} --name sql_generate_invisible_primary_key --value OFF'
   }
   tags: tags
-  dependsOn: [ uamiMySqlRoleAssignmentModule ]
+  dependsOn: [uamiMySqlRoleAssignmentModule]
 }
 
-output mySqlServerName string = server.name
-output databaseName string = database.name
-output sqlAdmin string = server.properties.administratorLogin
-output fqdn string = server.properties.fullyQualifiedDomainName
+output mySqlServerName string = flexibleServer.outputs.name
+output databaseName string = databaseName
+output sqlAdmin string = adminUserName // server.properties.administratorLogin
+output fqdn string = flexibleServer.outputs.fqdn
