@@ -46,6 +46,10 @@ param prerequisiteCommand string = '/home/startup.sh'
 param deploymentTime string = utcNow()
 
 param enableAppServicePrivateEndpoint bool = true
+param deployApplicationGateway bool = false
+// Below two params are required when deploying the App Gateway
+param tlsCertificateInKeyVaultId string = ''
+param redcapDomainName string = ''
 
 @description('The password to use for the MySQL Flexible Server admin account \'sqladmin\'.')
 @secure()
@@ -105,17 +109,17 @@ var rgNamingStructure = replace(
 )
 // The name of the VNet is either a new name or the name of the existing VNet parsed from the resource ID
 var vnetName = empty(existingVirtualNetworkId)
-  ? nameModule[0].outputs.shortName
+  ? nameModule[0].outputs.validName
   : split(existingVirtualNetworkId, '/')[8]
 
-var strgName = nameModule[1].outputs.shortName
-var webAppName = nameModule[2].outputs.shortName
-var kvName = nameModule[3].outputs.shortName
-var sqlName = nameModule[4].outputs.shortName
-var planName = nameModule[5].outputs.shortName
-var uamiName = nameModule[6].outputs.shortName
-var dplscrName = nameModule[7].outputs.shortName
-var lawName = nameModule[8].outputs.shortName
+var strgName = nameModule[1].outputs.validName
+var webAppName = nameModule[2].outputs.validName
+var kvName = nameModule[3].outputs.validName
+var sqlName = nameModule[4].outputs.validName
+var planName = nameModule[5].outputs.validName
+var uamiName = nameModule[6].outputs.validName
+var dplscrName = nameModule[7].outputs.validName
+var lawName = nameModule[8].outputs.validName
 
 var deploymentNameStructure = '${workloadName}-${environment}-${sequenceFormatted}-{rtype}-${deploymentTime}'
 
@@ -125,36 +129,10 @@ param subnets object = {
   // TODO: Add existingSubnetName property for existing subnet
   PrivateLinkSubnet: {
     addressPrefix: cidrSubnet(vnetAddressSpace, 27, 0)
-    serviceEndpoints: [
-      {
-        service: 'Microsoft.KeyVault'
-        locations: [
-          location
-        ]
-      }
-      {
-        service: 'Microsoft.Storage'
-        locations: [
-          location
-        ]
-      }
-    ]
   }
   ComputeSubnet: {
     addressPrefix: cidrSubnet(vnetAddressSpace, 27, 1)
     serviceEndpoints: [
-      {
-        service: 'Microsoft.KeyVault'
-        locations: [
-          location
-        ]
-      }
-      {
-        service: 'Microsoft.Storage'
-        locations: [
-          location
-        ]
-      }
       {
         service: 'Microsoft.Web'
         locations: [
@@ -166,47 +144,17 @@ param subnets object = {
   IntegrationSubnet: {
     // Two /27 have already been created, which add up to a /26. This the second /26 (index = 1).
     addressPrefix: cidrSubnet(vnetAddressSpace, 26, 1)
-    serviceEndpoints: [
-      {
-        service: 'Microsoft.KeyVault'
-        locations: [
-          location
-        ]
-      }
-      {
-        service: 'Microsoft.Storage'
-        locations: [
-          location
-        ]
-      }
-      {
-        service: 'Microsoft.Web'
-        locations: [
-          location
-        ]
-      }
-    ]
     delegation: 'Microsoft.Web/serverFarms'
   }
   MySQLFlexSubnet: {
-    // TODO: /29 seems very small
     // Two /26 have been allocated; that's equivalent to sixteen /29s.
     addressPrefix: cidrSubnet(vnetAddressSpace, 29, 16)
-    serviceEndpoints: [
-      {
-        service: 'Microsoft.KeyVault'
-        locations: [
-          location
-        ]
-      }
-      {
-        service: 'Microsoft.Storage'
-        locations: [
-          location
-        ]
-      }
-    ]
     delegation: 'Microsoft.DBforMySQL/flexibleServers'
+  }
+  // TODO: Make AppGatewaySubnet optional
+  // TODO: Add NSG and route table
+  AppGatewaySubnet: {
+    addressPrefix: cidrSubnet(vnetAddressSpace, 26, 3)
   }
 }
 
@@ -232,11 +180,14 @@ var resourceTypes = [
   'uami'
   'dplscr'
   'law'
+  'agw'
+  'pip'
 ]
 
 @batchSize(1)
 module nameModule 'modules/common/createValidAzResourceName.bicep' = [
   for workload in resourceTypes: {
+    #disable-next-line BCP334
     name: take(replace(deploymentNameStructure, '{rtype}', 'nameGen-${workload}'), 64)
     params: {
       location: location
@@ -251,6 +202,7 @@ module nameModule 'modules/common/createValidAzResourceName.bicep' = [
 ]
 
 module rolesModule './modules/common/roles.bicep' = {
+  #disable-next-line BCP334
   name: take(replace(deploymentNameStructure, '{rtype}', 'roles'), 64)
 }
 
@@ -263,6 +215,7 @@ var secretNames = concat(defaultSecretNames, additionalSecretNames)
 // The output will be in alphabetical order
 // LATER: Output an object instead
 module kvSecretReferencesModule './modules/common/appSvcKeyVaultRefs.bicep' = {
+  #disable-next-line BCP334
   name: take(replace(deploymentNameStructure, '{rtype}', 'kv-secrets'), 64)
   params: {
     keyVaultName: kvName
@@ -270,10 +223,17 @@ module kvSecretReferencesModule './modules/common/appSvcKeyVaultRefs.bicep' = {
   }
 }
 
+resource networkResourceGroup 'Microsoft.Resources/resourceGroups@2022-09-01' = {
+  name: replace(rgNamingStructure, '{rgName}', 'network')
+  location: location
+  tags: tags
+}
+
 module virtualNetworkModule './modules/networking/main.bicep' = if (empty(existingVirtualNetworkId)) {
+  #disable-next-line BCP334
   name: take(replace(deploymentNameStructure, '{rtype}', 'network'), 64)
+  scope: networkResourceGroup
   params: {
-    resourceGroupName: replace(rgNamingStructure, '{rgName}', 'network')
     virtualNetworkName: vnetName
     vnetAddressPrefix: vnetAddressSpace
     location: location
@@ -289,6 +249,7 @@ module virtualNetworkModule './modules/networking/main.bicep' = if (empty(existi
 }
 
 module monitoring './modules/monitoring/main.bicep' = {
+  #disable-next-line BCP334
   name: take(replace(deploymentNameStructure, '{rtype}', 'monitoring'), 64)
   params: {
     resourceGroupName: replace(rgNamingStructure, '{rgName}', 'monitoring')
@@ -307,14 +268,15 @@ module monitoring './modules/monitoring/main.bicep' = {
 }
 
 var privateEndpointSubnetId = empty(existingVirtualNetworkId)
-  ? virtualNetworkModule.outputs.subnets.PrivateLinkSubnet.id
+  ? virtualNetworkModule.?outputs.?subnets.?PrivateLinkSubnet.?id
   : '${existingVirtualNetworkId}/subnets/${subnets.PrivateLinkSubnet.existingSubnetName}'
 
 var virtualNetworkId = empty(existingVirtualNetworkId)
-  ? virtualNetworkModule.outputs.virtualNetworkId
+  ? virtualNetworkModule.?outputs.?virtualNetworkId
   : existingVirtualNetworkId
 
 module storageAccountModule './modules/storage/main.bicep' = {
+  #disable-next-line BCP334
   name: take(replace(deploymentNameStructure, '{rtype}', 'storage'), 64)
   params: {
     resourceGroupName: replace(rgNamingStructure, '{rgName}', 'storage')
@@ -325,7 +287,7 @@ module storageAccountModule './modules/storage/main.bicep' = {
     kind: 'StorageV2'
     storageAccountSku: 'Standard_LRS'
 
-    virtualNetworkId: virtualNetworkId
+    virtualNetworkId: virtualNetworkId!
     privateDnsZoneName: 'privatelink.blob.${az.environment().suffixes.storage}'
     existingPrivateDnsZonesResourceGroupId: existingPrivateDnsZonesResourceGroupId
 
@@ -342,6 +304,7 @@ module storageAccountModule './modules/storage/main.bicep' = {
 }
 
 module keyVaultModule './modules/kv/main.bicep' = {
+  #disable-next-line BCP334
   name: take(replace(deploymentNameStructure, '{rtype}', 'keyVault'), 64)
   params: {
     resourceGroupName: replace(rgNamingStructure, '{rgName}', 'keyVault')
@@ -352,7 +315,7 @@ module keyVaultModule './modules/kv/main.bicep' = {
       workloadType: 'keyVault'
     }
     peSubnetId: privateEndpointSubnetId
-    virtualNetworkId: virtualNetworkId
+    virtualNetworkId: virtualNetworkId!
     existingPrivateDnsZonesResourceGroupId: existingPrivateDnsZonesResourceGroupId
     roleAssignments: [
       {
@@ -373,6 +336,7 @@ module keyVaultModule './modules/kv/main.bicep' = {
 }
 
 module mySqlModule './modules/sql/main.bicep' = {
+  #disable-next-line BCP334
   name: take(replace(deploymentNameStructure, '{rtype}', 'mysql'), 64)
   params: {
     resourceGroupName: replace(rgNamingStructure, '{rgName}', 'database')
@@ -388,7 +352,7 @@ module mySqlModule './modules/sql/main.bicep' = {
     StorageSizeGB: mySqlStorageSizeGB
     StorageIops: mySqlStorageIops
     peSubnetId: empty(existingVirtualNetworkId)
-      ? virtualNetworkModule.outputs.subnets.MySQLFlexSubnet.id
+      ? virtualNetworkModule.?outputs.?subnets.?MySQLFlexSubnet.?id
       : '${existingVirtualNetworkId}/subnets/${subnets.MySQLFlexSubnet.existingSubnetName}'
     privateDnsZoneName: 'privatelink.mysql.database.azure.com'
     existingPrivateDnsZonesResourceGroupId: existingPrivateDnsZonesResourceGroupId
@@ -412,7 +376,7 @@ module mySqlModule './modules/sql/main.bicep' = {
     database_charset: 'utf8'
     database_collation: 'utf8_general_ci'
 
-    virtualNetworkId: virtualNetworkId
+    virtualNetworkId: virtualNetworkId!
 
     deploymentNameStructure: deploymentNameStructure
   }
@@ -427,6 +391,7 @@ resource webAppResourceGroup 'Microsoft.Resources/resourceGroups@2023-07-01' = {
 }
 
 module webAppModule './modules/webapp/main.bicep' = {
+  #disable-next-line BCP334
   name: take(replace(deploymentNameStructure, '{rtype}', 'appService'), 64)
   scope: webAppResourceGroup
   params: {
@@ -445,7 +410,7 @@ module webAppModule './modules/webapp/main.bicep' = {
 
     existingPrivateDnsZonesResourceGroupId: existingPrivateDnsZonesResourceGroupId
     privateDnsZoneName: 'privatelink.azurewebsites.net'
-    virtualNetworkId: virtualNetworkId
+    virtualNetworkId: virtualNetworkId!
 
     redcapZipUrl: redcapZipUrl
     dbHostName: mySqlModule.outputs.fqdn
@@ -464,7 +429,7 @@ module webAppModule './modules/webapp/main.bicep' = {
 
     // Enable VNet integration
     integrationSubnetId: empty(existingVirtualNetworkId)
-      ? virtualNetworkModule.outputs.subnets.IntegrationSubnet.id
+      ? virtualNetworkModule.?outputs.?subnets.?IntegrationSubnet.?id
       : '${existingVirtualNetworkId}/subnets/${subnets.IntegrationSubnet.existingSubnetName}'
 
     scmRepoUrl: scmRepoUrl
@@ -486,7 +451,34 @@ module webAppModule './modules/webapp/main.bicep' = {
   }
 }
 
+module appGatewayModule './modules/appGateway/appGateway.bicep' = if (deployApplicationGateway && empty(existingVirtualNetworkId)) {
+  #disable-next-line BCP334
+  name: take(replace(deploymentNameStructure, '{rtype}', 'agw'), 64)
+  scope: networkResourceGroup
+  params: {
+    name: nameModule[9].outputs.validName
+    tags: tags
+    backendUrl: webAppModule.outputs.webAppUrl
+
+    roles: rolesModule.outputs.roles
+
+    agwSku: 'Standard_v2'
+    domainName: redcapDomainName
+    pipName: nameModule[10].outputs.validName
+    subnetId: empty(existingVirtualNetworkId)
+      ? virtualNetworkModule.?outputs.?subnets.?AppGatewaySubnet.?id
+      : '${existingVirtualNetworkId}/subnets/${subnets.AppGatewaySubnet.existingSubnetName}'
+
+    tlsCertificateInKeyVaultId: tlsCertificateInKeyVaultId
+    uamiId: uamiModule.outputs.id
+    uamiPrincipalId: uamiModule.outputs.principalId
+
+    deploymentNameStructure: deploymentNameStructure
+  }
+}
+
 module uamiModule 'modules/uami/main.bicep' = {
+  #disable-next-line BCP334
   name: take(replace(deploymentNameStructure, '{rtype}', 'uami'), 64)
   scope: webAppResourceGroup
   params: {
